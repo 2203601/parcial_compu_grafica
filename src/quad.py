@@ -52,7 +52,7 @@ class Quad(Model):
         ], dtype="i4")
 
 
-        super().__init__(vertices, indices, colors, texcoords, normals)
+        super().__init__(vertices, indices, colors, normals, texcoords)
 
     def check_hit(self, origin, direction):
         return self.__colision.check_hit(origin, direction)

@@ -1,5 +1,6 @@
 from texture import Texture
-
+from bvh import BVH
+from shader_program import ComputeShaderProgram
 #  generar un frame del raytracing en CPU y 
 # depositarlo en una textura que luego visualizará un Quad
 
@@ -39,3 +40,59 @@ class RayTracer:
     def get_texture(self):
         return self.framebuffer.image_data
     
+# inicializa y maneja el compute shader de raytracing
+# crear una textura de salida en la que se escribira el resultado
+# actualizar dicha textura en los graficos de salida
+
+
+class RayTracerGPU:
+    def __init__(self, ctx, camera, width, height, output_graphics):
+        self.ctx = ctx
+        self.width, self.height = width, height
+        self.camera = camera
+        self.width = width
+        self.height = height
+        self.compute_shader = ComputeShaderProgram(self.ctx, "shaders/raytracing.comp")
+        self.output_graphics = output_graphics
+
+        # seleccionamos una unidad de imagen
+        self.texture_unit = 0
+        # crear la textura de salida con el tamaño pedido y el formato
+        self.output_texture = Texture("u_texture", self.width, self.height, 4, None, (255,255,255,255))
+       # enviarr textura a graphics para que el quad la tenga disponible
+        self.output_graphics.update_texture("u_texture", self.output_texture.image_data)
+       # vincular la textura como la imagen para el compute shader
+        self.output_graphics.bind_to_image("u_texture", self.texture_unit, read=False, write=True)
+
+        # incializamos los valores de la posicón, target y fov
+        self.compute_shader.set_uniform('cameraPosition', self.camera.position)
+        self.compute_shader.set_uniform('inverseViewMatrix', self.camera.get_inverse_view_matrix())
+        self.compute_shader.set_uniform('fieldOfView', self.camera.fov)
+
+    def resize(self, width, height):
+        self.width, self.height = width, height
+        self.output_texture = Texture("u_texture", width, height, 4, None, (255,255,255,255))
+        self.output_graphics.update_texture("u_texture", self.output_texture.image_data)
+
+    # convierte un arreglo en un buffer de GPU y lo vincula a un índice (binding) específico
+    def matrix_to_ssbo(self, matrix, binding=0):
+        buffer = self.ctx.buffer(matrix.tobytes())
+        # se usa para que el compute shader pueda escribir directamente en una textura.
+        buffer.bind_to_storage_buffer(binding = binding)
+
+    # divide el espacio en cajas que contienen primitivas, 
+    # reduciendo drásticamente el número de chequeos de colisión que debe hacer cada rayo.
+    def primitives_to_ssbo(self, primitives, binding = 3):
+        self.bvh_nodes = BVH(primitives)
+        self.bvh_ssbo = self.bvh_nodes.pack_to_bytes()
+        buf_bvh = self.ctx.buffer(self.bvh_ssbo);
+        buf_bvh.bind_to_storage_buffer(binding=binding)
+
+    # divide en bloques y asigna un work group por bloque
+    def run(self):
+        groups_x = (self.width + 15 ) // 16
+        groups_y = (self.height + 15 ) // 16
+
+        self.compute_shader.run(groups_x=groups_x, groups_y=groups_y, groups_z=1)
+        self.ctx.clear(0.0, 0.0, 0.0, 1.0)
+        self.output_graphics.render({"u_texture": self.texture_unit})

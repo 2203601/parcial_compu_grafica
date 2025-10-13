@@ -1,3 +1,5 @@
+import numpy as np
+import glm
 # crea el VBO, IBO y VAO con el shaderprogram  y el format
 # implementa el metodo render para renderizar el vao
 
@@ -58,7 +60,9 @@ class Graphics:
         #Devolver lista con pares (nombre de textura, textura en memoria de GPU).
         return textures
 
-
+    def bind_to_image(self, name = "u_texture", unit = 0, read = False, write=True):
+        self.__textures[name][1].bind_to_image(unit, read, write)
+        
     def render(self,uniforms):
         #Actualizar uniforms: los valores dinámicos (MVP, luz, tiempo) se actualizan por draw call. 
         # Iterar uniforms.items() y, si el nombre existe en el shader,
@@ -85,3 +89,42 @@ class Graphics:
         texture_obj, texture_ctx = self.__textures[texture_name]
         texture_obj.update_data(new_data)
         texture_ctx.write(texture_obj.get_bytes())
+
+# encargada de generar SSBOs (shader storage buffer objects)
+# interfaz entre un modelo y el sistema de raytracing en GPU
+class ComputeGraphics(Graphics):
+    def __init__(self, ctx, model, material):
+        self.__ctx = ctx
+        self.__model = model
+        self.__material = material
+        self.textures = material.textures_data        
+        super().__init__(ctx, model, material)
+
+    # calcula la AABB de un obj y la agrega a la lista de primitivas
+    def create_primitive(self, primitives):
+        amin, amax = self.__model.aabb
+        primitives.append({"aabb_min": amin, "aabb_max": amax})
+
+    # genera la matriz 4x4 del objeto y la guarda en el array
+    def create_transformation_matrix(self, transformations_matrix, index):
+        m = self.__model.get_model_matrix()
+        transformations_matrix[index, :] = np.array(m.to_list(), dtype="f4").reshape(16)
+
+    # guarda la matriz inversa, necesaria para pasar de coordenadas globales a locales.
+    def create_inverse_transformation_matrix(self, inverse_transformations_matrix, index):
+        m = self.__model.get_model_matrix()
+        inverse = glm.inverse(m)
+        inverse_transformations_matrix[index, :] = np.array(inverse.to_list(), dtype="f4").reshape(16)
+
+    # empaqueta el color y reflectividad en un arreglo de 4 valores.
+    def create_material_matrix(self, materials_matrix, index):
+        reflectivity = self.__material.reflectivity
+        r,g,b = self.__material.colorRGB
+
+        r = r / 255.00 if r > 1.0 else r
+        g = g / 255.00 if g > 1.0 else g
+        b = b / 255.00 if b > 1.0 else b
+
+        materials_matrix[index, :] = np.array([r,g,b,reflectivity], dtype="f4")
+
+    

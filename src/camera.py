@@ -80,3 +80,10 @@ class Camera:
         ray_dir_world = glm.vec3(inv_view * glm.vec4(ray_dir_camera, 0.0))
 
         return Ray(self.position, ray_dir_world)
+    
+    def get_view_matrix(self):
+        return glm.lookAt(self.position, self.target, self.up)
+    
+     
+    def get_inverse_view_matrix(self):
+        return glm.inverse(self.get_view_matrix())

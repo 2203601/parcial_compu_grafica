@@ -75,5 +75,5 @@ class ComputeShaderProgram:
                 uniform.value = value
 
     def run(self, groups_x, groups_y, groups_z=1):
-        self.prog.run(groups_x=groups_x, groups_y=groups_y, groups_z=groups_z)
+        self.prog.run(group_x=groups_x, group_y=groups_y, group_z=groups_z)
 

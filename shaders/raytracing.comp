@@ -48,7 +48,27 @@ struct RayHit{
     vec3 color;        // color del material
     float reflectivity; // reflectividad
 
-}
+};
+
+bool intersectAxisAlignedBox(vec3 rayOrigin, vec3 rayDirection, 
+                            vec3 boxMin, vec3 boxMax, 
+                            out float timeNear, out float timeFar){
+
+    // calcula en qué valor de tiempo el rayo cruza
+    vec3 timeAtMinPlane = (boxMin - rayOrigin) / rayDirection;
+    vec3 timeAtMaxPlane = (boxMax - rayOrigin) / rayDirection;
+
+    // ordenar los tiempos
+    vec3 timeMin = min(timeAtMinPlane, timeAtMaxPlane);
+    vec3 timeMax = max(timeAtMinPlane, timeAtMaxPlane);
+
+    // encontrar la entrada y salida global
+    timeNear = max(max(timeMin.x , timeMin.y), timeMin.z);
+    timeFar = min(min(timeMax.x, timeMax.y), timeMax.z);
+    return timeFar >= max(timeNear, 0.0);
+
+
+};
 
 // los OBB son cajas que pueden estar rotadas, escaladas y trasladadas
 bool intersectOrientedBox(int objectIndex, vec3 rayOriginWorld, vec3 rayDirectionWorld,
@@ -104,7 +124,7 @@ bool intersectOrientedBox(int objectIndex, vec3 rayOriginWorld, vec3 rayDirectio
    //y se retorna verdadero confirmando la intersección válida.
 
     return hitDistance > EPS;
-}
+};
 
 RayHit traverseBoundingVolumeHierarchy(vec3 rayOrigin, vec3 rayDirection) {
     // Se inicializa la estructura RayHit que almacenará la intersección más cercana encontrada. 
@@ -180,7 +200,7 @@ RayHit traverseBoundingVolumeHierarchy(vec3 rayOrigin, vec3 rayDirection) {
         }
     }
     return closestHit;
-}
+};
 
 // calculo de sombras
 float calculateShadow(vec3 surfacePosition, vec3 surfaceNormal){
@@ -191,7 +211,7 @@ float calculateShadow(vec3 surfacePosition, vec3 surfaceNormal){
     // Si el método retorna didHit verdadero, significa que hay un objeto bloqueando la luz, por lo que el punto está en sombra y se retorna 0.
     // Si didHit es falso, no hay oclusión y se retorna 1.0. completamente iluminado
     return traverseBoundingVolumeHierarchy(shadowRayOrigin, LIGHT_DIRECTION).didHit ? 0.3 : 1.0;
-}
+};
 
 vec3 calculateShading(vec3 surfaceColor, vec3 surfacePosition, vec3 surfaceNormal, vec3 viewDirection){
     float diffuseIntensity = max(dot(surfaceNormal, LIGHT_DIRECTION), 0.0);
@@ -209,28 +229,11 @@ vec3 calculateShading(vec3 surfaceColor, vec3 surfacePosition, vec3 surfaceNorma
 
     vec3 shadedColor = ambient + shadow;
     return shadedColor;
-}
+};
 
 
-bool intersectAxisAlignedBox(vec3 rayOrigin, vec3 rayDirection, 
-                            vec3 boxMin, vec3 boxMax, 
-                            out float timeNear, out float timeFar){
-
-    // calcula en qué valor de tiempo el rayo cruza
-    vec3 timeAtMinPlane = (boxMin - rayOrigin) / rayDirection;
-    vec3 timeAtMaxPlane = (boxMax - rayOrigin) / rayDirection;
-
-    // ordenar los tiempos
-    vec3 timeMin = min(timeAtMinPlane, timeAtMaxPlane);
-    vec3 timeMax = max(timeAtMinPlane, timeAtMaxPlane);
-
-    // encontrar la entrada y salida global
-    timeNear = max(max(timeMin.x , timeMin.y), timeMin.z);
-    timeFar = min(min(timeMax.x, timeMax.y), timeMax.z);
-    return timeFar >= max(timeNear, 0.0);
 
 
-}
 
 void main(){
     // Cada thread conoce exactamente su posición en la grilla de ejecución. 

@@ -271,15 +271,37 @@ void main(){
     vec3 hitPos;
     vec3 hitNorm;
 
-    vec3 finalColor;
+    // guarda el color final del pixel, sumando los aportes de cada rebote
+    vec3 accumulatedColor = vec3(0.0);
+   // cuanta energia o intensidad conserva el rayo
+    vec3 rayThroughput = vec3(1.0);
 
-    RayHit hit = traverseBoundingVolumeHierarchy(rayOrigin, rayDirection);
+    for(int boundeIndex = 0; boundeIndex < MAX_RAY_BOUNCES; boundeIndex++){
+        RayHit hit = traverseBoundingVolumeHierarchy(rayOrigin, rayDirection);
 
-    if(hit.didHit){
-        finalColor = calculateShading(hit.color, hit.position, hit.normal, -rayDirection);
-    }else{
-        finalColor = vec3(0.0);
+        if(hit.didHit){
+            vec3 shadedColor = calculateShading (hit.color, hit.position, hit.normal, -rayDirection);
+            // si es 0, mate. si es 1, espejo.
+           //se usa camp para asegurar que sea en ese rango
+            float reflectivity = clamp(hit.reflectivity, 0.0, 1.0);
+           
+            //la parte absorbida contribuye al color del pixel
+            accumulatedColor += rayThroughput * (1.0 - reflectivity) * shadedColor;
+           
+            //la parte reflejada continua viajando
+            rayThroughput *= reflectivity;
+
+            if(max(max(rayThroughput.x, rayThroughput.y), rayThroughput.z) < 1e-3) break;
+
+            // evitar intersecciones
+            rayOrigin = hit.position + hit.normal * EPS;
+            rayDirection = reflect(rayDirection, hit.normal);
+        }else {
+            accumulatedColor += rayThroughput * vec3(0.6, 0.8, 1.0) * (1.0 - rayDirection.y);
+            break;
+        }
     }
 
-    imageStore(outputImage, pixelCoords, vec4(finalColor, 1.0));
+    vec3 gammaCorrection = pow(accumulatedColor, vec3(1.0/2.2));
+    imageStore(outputImage, pixelCoords, vec4(gammaCorrection, 1.0));
 }
